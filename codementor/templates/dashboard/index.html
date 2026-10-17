@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Overview · CodeMentor AI{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div><p class="eyebrow">{{ now().strftime('%A, %B %d, %Y')|upper }}</p><h1>Good to see you, {{ current_user.username }}.</h1><p class="muted">Small, consistent practice builds strong problem solvers.</p></div>
+  <div class="header-badge"><span class="pulse-dot"></span> YOUR LEARNING SPACE</div>
+</header>
+
+<section class="metric-grid" aria-label="Learning summary">
+  <article class="metric-card"><div class="metric-top"><span>Problems solved</span><span class="metric-icon blue" aria-hidden="true">✓</span></div><div class="metric-value">{{ total_solved }}<span class="metric-unit"> problems</span></div><div class="metric-note">Your completed practice</div></article>
+  <article class="metric-card"><div class="metric-top"><span>Current streak</span><span class="metric-icon amber" aria-hidden="true">↗</span></div><div class="metric-value">{{ streak }}<span class="metric-unit"> days</span></div><div class="metric-note">Consecutive days with a solve</div></article>
+  <article class="metric-card"><div class="metric-top"><span>In progress</span><span class="metric-icon violet" aria-hidden="true">◷</span></div><div class="metric-value">{{ attempted_count }}<span class="metric-unit"> problems</span></div><div class="metric-note">Problems you have started</div></article>
+  <article class="metric-card goal-card"><div class="metric-top"><span>Daily goal</span><span class="metric-icon green" aria-hidden="true">◎</span></div><div class="metric-value">{{ solved_today }}<span class="goal-divider"> / </span>{{ daily_goal }}<span class="metric-unit"> today</span></div><div class="goal-track" role="progressbar" aria-label="Daily goal progress" aria-valuemin="0" aria-valuemax="{{ daily_goal }}" aria-valuenow="{{ [solved_today, daily_goal]|min }}"><span style="width: {{ [((solved_today / daily_goal) * 100)|int, 100]|min }}%"></span></div><div class="metric-note">{{ 'Goal reached — nice work.' if solved_today >= daily_goal else (daily_goal - solved_today) ~ ' more to reach your goal' }}</div></article>
+</section>
+
+<section class="charts-grid" aria-label="Learning analytics">
+  <article class="panel chart-panel activity-panel"><div class="panel-heading"><div><p class="eyebrow">CONSISTENCY</p><h2>Solving activity</h2></div><span class="chart-period">LAST 14 DAYS</span></div><div class="chart-canvas"><canvas id="activityChart" role="img" aria-label="Problems solved each day during the last 14 days"></canvas></div></article>
+  <article class="panel chart-panel difficulty-panel"><div class="panel-heading"><div><p class="eyebrow">COMPLETED</p><h2>By difficulty</h2></div></div>{% if total_solved %}<div class="difficulty-chart"><canvas id="difficultyChart" role="img" aria-label="Solved problem counts by difficulty"></canvas></div><div class="chart-legend">{% for label in difficulty.labels %}<span><i class="legend-dot {{ label|lower }}"></i>{{ label }} <strong>{{ difficulty.values[loop.index0] }}</strong></span>{% endfor %}</div>{% else %}<div class="chart-empty"><span class="empty-icon">◌</span><p>Solve a problem to see your difficulty mix.</p></div>{% endif %}</article>
+</section>
+
+<section class="content-grid">
+  <article class="panel topic-panel"><div class="panel-heading"><div><p class="eyebrow">YOUR PRACTICE</p><h2>Topic progress</h2></div><span class="panel-symbol" aria-hidden="true">⌁</span></div>
+    {% if topic_progress %}<div class="topic-list">{% for item in topic_progress %}<div class="topic-row"><span class="topic-name">{{ item.topic }}</span><div class="topic-track" role="progressbar" aria-label="{{ item.topic }} solved progress" aria-valuemin="0" aria-valuemax="{{ item.total }}" aria-valuenow="{{ item.solved }}"><span style="width: {{ item.percent }}%"></span></div><strong>{{ item.solved }}<small> / {{ item.total }}</small></strong></div>{% endfor %}</div>
+    {% else %}<div class="empty-state"><div class="empty-icon">⌁</div><h3>Your topic map starts here</h3><p>Once problems are added to the catalog, you’ll see your progress by topic here.</p></div>{% endif %}
+  </article>
+  <article class="panel focus-panel"><p class="eyebrow">A GOOD PLACE TO START</p><div class="focus-icon" aria-hidden="true">✦</div><h2>Show up consistently.</h2><p class="muted">A small daily session helps ideas stick. Your goal is {{ daily_goal }} {{ 'problem' if daily_goal == 1 else 'problems' }} a day.</p><div class="focus-callout"><span class="callout-dot"></span><span>Progress is saved to your account as you practice.</span></div></article>
+</section>
+<footer class="dashboard-footer"><span>CODEMENTOR AI <span class="footer-sep">/</span> LEARNING IN PROGRESS</span><span>Made for curious problem solvers</span></footer>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+<script>
+  window.addEventListener('load', function () {
+    if (!window.Chart) return;
+    const activity = {{ activity|tojson }};
+    const difficulty = {{ difficulty|tojson }};
+    const grid = 'rgba(135, 157, 189, .10)';
+    new Chart(document.getElementById('activityChart'), {
+      type: 'bar',
+      data: { labels: activity.map(day => day.label), datasets: [{ data: activity.map(day => day.count), backgroundColor: 'rgba(101, 147, 245, .72)', hoverBackgroundColor: '#8bb1ff', borderRadius: 4, maxBarThickness: 22 }] },
+      options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { displayColors: false, callbacks: { label: item => `${item.raw} ${item.raw === 1 ? 'problem' : 'problems'} solved` } } }, scales: { x: { grid: { display: false }, border: { display: false }, ticks: { color: '#788ba5', maxTicksLimit: 7, font: { family: 'DM Sans', size: 10 } } }, y: { beginAtZero: true, suggestedMax: 2, border: { display: false }, grid: { color: grid }, ticks: { precision: 0, color: '#788ba5', stepSize: 1, font: { family: 'DM Sans', size: 10 } } } } }
+    });
+    const difficultyCanvas = document.getElementById('difficultyChart');
+    if (difficultyCanvas) new Chart(difficultyCanvas, {
+      type: 'doughnut',
+      data: { labels: difficulty.labels, datasets: [{ data: difficulty.values, backgroundColor: ['#69a0ff', '#b18cff', '#ff9e83'], borderColor: '#101a29', borderWidth: 5, hoverOffset: 5 }] },
+      options: { maintainAspectRatio: false, cutout: '72%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: item => `${item.label}: ${item.raw}` } } } }
+    });
+  });
+</script>
+{% endblock %}
